@@ -1,0 +1,27 @@
+-- Dieses Modul extrahiert alle relevanten Unternehmensnamen aus dem Text. Alle Erwähnungen eines
+-- Unternehmens durch seinen Namen, seine Abkürzung oder eine andere zutreffende Bezeichnung wird auf
+-- ein einheitliches Firmenkürzel gemappt.
+module sentiment; 
+
+-- Erstellung einer Tabelle mit dem Mapping von Namensvarianten auf ein einheitliches Firmenkürzel.
+create external table CompanyToStock (id Text, companyName Text) allow_empty false;
+
+-- Extraktion aller genannten Firmennamen in ein Wörterbuch.
+create dictionary CompaniesDict
+from table CompanyToStock
+  	with entries from companyName
+  	and language as 'de';
+
+-- Finden aller Vorkommnisse von Firmennamen im Zieldokument.
+create view CompanyNames as
+extract dictionary 'CompaniesDict' 
+	on R.text as match
+from Document R;
+
+-- Reduzierung der Ergebnisse auf das einheitliche Namenskürzel der Firma.
+create view Companies as
+	select C2S.id as company, C2S.companyName as coveredText, C.match as match 
+from CompanyNames C, CompanyToStock C2S
+where Equals(GetText(C.match), GetText(C2S.companyName));
+export view Companies;
+output view Companies;

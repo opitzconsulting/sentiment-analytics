@@ -1,0 +1,16 @@
+<application-template xmlns="http://biginsights.ibm.com/application" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <name>TwitterAnalytics</name>
+    <description>Extrahiert inkrementell alle Tweets zu einem ausgewählten Schlüsselbegriff und für quantitative Analysen auf den Statusmeldungen durch. Üblicherweise ist der Suchbegriff der Name einer Firma.
+Derzeit implementierte Analysen:
+- Sentimentanalyse</description>
+    <properties>
+        <property description="Eindeutiger Bezeichner unter dem alle Suchergebnisse gespeichert werden sollen. Per Definition sind nur alphanumerische Zeichen in Lowercase und kein Leerzeichen zu verwenden." isInputPath="false" isOutputPath="false" isRequired="true" label="Firmenname" name="jobname" paramtype="STRING" uitype="textfield"/>
+        <property description="Der Suchbegriff, welcher zur Extraktion von Tweets auf Twitter genutzt wird." isInputPath="false" isOutputPath="false" isRequired="true" label="Suchbegriff" name="query" paramtype="STRING" uitype="textfield"/>
+        <property isInputPath="false" isOutputPath="false" isRequired="false" label="NameNode" name="nameNode" paramtype="STRING" uitype="textfield"/>
+    </properties>
+    <assets>
+        <asset id="TwitterAnalytics" type="WORKFLOW"/>
+    </assets>
+    <imagePath>icon.png</imagePath>
+    <categories>Web,Import,AQL,Data Transformation</categories>
+</application-template>

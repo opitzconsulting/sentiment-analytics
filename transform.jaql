@@ -1,0 +1,11 @@
+input := read(hdfs(SOURCE_FILE, {
+  format: 'org.apache.hadoop.mapred.TextInputFormat',
+  converter: 'com.ibm.jaql.io.hadoop.converter.FromJsonTextConverter'
+})) -> expand -> deempty() 
+  -> transform { match : JOBNAME, user : $.user, created_at : $.created_at, text : $.text };
+// Implement some filters here
+// Maybe with AQL
+input -> write(hdfs(OUTPUT_FILE, {
+  format: 'org.apache.hadoop.mapred.TextOutputFormat',
+  converter: 'com.ibm.jaql.io.hadoop.converter.ToJsonTextConverter'
+}));

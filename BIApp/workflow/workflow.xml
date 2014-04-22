@@ -1,0 +1,55 @@
+<workflow-app name="SocialMediaAnalytics" xmlns="uri:oozie:workflow:0.2">
+    <start to="ingress"/>
+    <action name="ingress">
+        <java>
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <prepare>
+                <mkdir path="${nameNode}/user/biadmin/tweets" />
+            </prepare>
+            <main-class>bigdata.twitter.TwitterIngress</main-class>
+            <arg>${query}</arg>
+            <arg>/tmp/tweets/${wf:id()}</arg>
+            <arg>/user/biadmin/tweets/${jobname}_since_id</arg>
+        </java>
+        <ok to="transform" />
+        <error to="kill" />
+    </action>
+    <action name="transform">
+        <jaql xmlns="uri:oozie:jaql-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <script>transform.jaql</script>
+            <eval>SOURCE_FILE='/tmp/tweets/${wf:id()}';
+OUTPUT_FILE='/user/biadmin/tweets/${jobname}/${wf:id()}';
+JOBNAME='${jobname}';</eval>
+        </jaql>
+        <ok to="sentiment" />
+        <error to="kill" />
+    </action>
+    <action name="sentiment">
+        <jaql xmlns="uri:oozie:jaql-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <prepare>
+                <delete path="${nameNode}/tmp/tweets/${wf:id()}" />
+            </prepare>
+            <script>sentiment.jaql</script>
+            <eval>SOURCE_DIR='/user/biadmin/tweets/${jobname}';
+OUTPUT_FILE='/biginsights/hive/warehouse/twitter.db/sentiment/${jobname}';
+JOBNAME='${jobname}';
+MODULE_PATH='/user/biadmin/analytics';
+IS_HAS_DICT='/user/biadmin/analytics/dictionaries/ishas.dict';
+CONTEXT_CHANGE_DICT='/user/biadmin/analytics/dictionaries/contextchange.dict';
+POSITIVE_CLUE_DICT='/user/biadmin/analytics/dictionaries/positive.csv';
+NEGATIVE_CLUE_DICT='/user/biadmin/analytics/dictionaries/negative.csv';
+COMPANY_DICT='/user/biadmin/analytics/dictionaries/companies.csv';</eval>
+        </jaql>
+        <ok to="end" />
+        <error to="kill" />
+    </action>
+    <kill name="kill">
+        <message>error message[${wf:errorMessage(wf:lastErrorNode())}]</message>
+    </kill>
+    <end name="end"/>
+</workflow-app>

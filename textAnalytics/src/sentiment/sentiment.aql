@@ -1,0 +1,63 @@
+-- Dieses Modul enthält alle Basiskonzepte zur Extraktion von Sentimenten.
+-- Es beinhaltet nicht die Verbindungs- und Satzbauregeln (diese sind im Modul Syntax
+-- enthalten), jedoch findet es positive und negative Hinweise ("gut", "schlecht", etc.),
+-- Verbindungsworte ("hat", "ist", etc.).
+module sentiment;
+
+-- Positive Hinweise	
+create external table PositiveClueWords (word Text, propability Integer) allow_empty true;
+
+create dictionary PositiveStockCluesDict
+from table PositiveClueWords
+  	with entries from word
+  	and language as 'de';
+  	
+create view PositiveClues as 
+	extract D.text as text, dictionary 'PositiveStockCluesDict' on D.text as match
+	from Document D;
+
+-- Negative Hinweise
+create external table NegativeClueWords (word Text, propability Integer) allow_empty true;
+
+create dictionary NegativeStockCluesDict
+from table NegativeClueWords
+  	with entries from word
+  	and language as 'de';
+  	
+create view NegativeClues as 
+	extract D.text as text, dictionary 'NegativeStockCluesDict' on D.text as match
+	from Document D;
+
+-- Zusammenführung der Hinweise. Das Feld "prov" enthält den Typ des Sentiments ("good" oder "bad").
+create view AllClues as 
+	(select C.match as match, CW.propability as prov
+	from NegativeClues C, NegativeClueWords CW
+	where Equals(GetText(C.match), GetText(CW.word)))
+	union all
+	(select C.match as match, CW.propability as prov
+	from PositiveClues C, PositiveClueWords CW
+	where Equals(GetText(C.match), GetText(CW.word)));
+export view AllClues;
+output view AllClues;
+
+-- Verbindungsworte in View laden.
+create external dictionary IsHasDict allow_empty false
+with case insensitive and language as 'de';
+
+create view IsHas as
+extract dictionary 'IsHasDict' 
+	on R.text as match
+from Document R;
+export view IsHas;
+output view IsHas;
+
+-- Negationsworte in View laden.
+create external dictionary ContextChangeDict allow_empty false
+with case insensitive and language as 'de';
+
+create view ContextChange as
+extract dictionary 'ContextChangeDict' 
+	on R.text as match
+from Document R;
+export view ContextChange;
+output view ContextChange;

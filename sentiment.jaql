@@ -1,0 +1,46 @@
+import systemT;
+isHasDict = read(lines(location=IS_HAS_DICT));
+contextChange = read(lines(location=CONTEXT_CHANGE_DICT));
+input = read(hdfs(SOURCE_DIR, {
+  format: 'org.apache.hadoop.mapred.TextInputFormat',
+  converter: 'com.ibm.jaql.io.hadoop.converter.FromJsonTextConverter'
+}));
+result = input -> transform {
+  text : $.text,
+  date : to_string(dateParse(strcat(
+    substring($.created_at, 25, 30), strcat(' ', substring($.created_at, 3, 10))), 
+    bias='ymd', locale='en'), fmt = 'yyyy/MM/dd')
+} -> group by date = $.date into {
+  date,
+  text : combine($.text, fn (a, b) strJoin(pair(a, b), " ... ")),
+  label : JOBNAME
+} -> transform systemT::annotateDocument(
+  $, 
+  [ "sentiment" ],
+  [ MODULE_PATH ],
+  externalTables = {
+    "sentiment.CompanyToStock" : COMPANY_DICT,
+    "sentiment.PositiveClueWords" : POSITIVE_CLUE_DICT,
+    "sentiment.NegativeClueWords" : NEGATIVE_CLUE_DICT
+  },
+  externalDictionaries = {
+    "sentiment.IsHasDict" : isHasDict,
+    "sentiment.ContextChangeDict" : contextChange
+  },
+  tokenizer = "multilingual",
+  spanOutputPolicy = "toJsonString",
+  language = "de"
+) -> expand each doc (
+  doc."sentiment.SentimentOutput" -> filter $.entity == JOBNAME -> transform each tweet {
+    id : doc.label,
+    date : doc.date,
+    match : tweet.totalMatch,
+    rating : tweet.sentimentProv,
+    sentiment :
+      if (tweet.sentimentProv < -3000) 'negative'
+      else if (tweet.sentimentProv > 3000) 'positive'
+      else 'neutral'
+  }
+);
+result -> write(del(location=OUTPUT_FILE, 
+  schema=schema { id, date, sentiment, rating, match }, delimiter='|'));

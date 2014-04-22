@@ -1,0 +1,62 @@
+module sentiment; 
+
+-- Matching aller relevanten Entitäten (Subjekt) in eine fixe View.
+create view Entities as select C.company as entity, C.match as match from Companies C;
+
+-- Syntax-Regeln: is/has Regeln, Abstände der Wörter, etc.
+create view BasicMatches as
+	(select S.match as sentimentMatch, 
+			E.match as entityMatch, 
+			E.entity as entity, 
+			S.prov as sentimentProv, 
+			CombineSpans(S.match, E.match) as totalMatch
+	from AllClues S, Entities E
+	where FollowsTok(S.match, E.match, 0, 2)
+	consolidate on S.match using 'ExactMatch')
+	union all
+	(select S.match as sentimentMatch, 
+			E.match as entityMatch, 
+			E.entity as entity, 
+			S.prov as sentimentProv, 
+			CombineSpans(E.match, S.match) as totalMatch
+	from AllClues S, Entities E
+	where FollowsTok(E.match, S.match, 0, 8)
+	consolidate on S.match using 'ExactMatch')
+	union all
+	(select S.match as sentimentMatch, 
+			E.match as entityMatch, 
+			E.entity as entity, 
+			S.prov as sentimentProv, 
+			CombineSpans(E.match, S.match) as totalMatch
+	from AllClues S, Entities E, IsHas I
+	where FollowsTok(E.match, I.match, 0, 6) and FollowsTok(I.match, S.match, 0, 6)
+	consolidate on S.match using 'ExactMatch');
+
+-- Entfernung jeglicher Einträge, die noch einen weiteren Firmennamen zwischen den relevanten Tokens haben.
+create view RemoveMiddleEntities as 
+	(select I.* from BasicMatches I)
+	minus
+	(select I.* from BasicMatches I, Entities E
+	where Contains(SpanBetween(I.entityMatch, I.sentimentMatch), E.match));
+
+-- Entfernung jeglicher Aussagen mit Negation.
+create view RemoveNegations as 
+	(select R.* from RemoveMiddleEntities R)
+	minus
+	(select R.* from RemoveMiddleEntities R, ContextChange S
+	where Contains(SpanBetween(R.entityMatch, R.sentimentMatch), S.match));
+
+-- Veröffentlichung der finalen, konsolidierten View
+create view Aggregation as
+	select List(S.sentimentMatch) as sentimentMatch, 
+		S.entityMatch as entityMatch, 
+		Max(S.entity) as entity, 
+		Sum(S.sentimentProv) as sentimentProv, 
+		Max(S.totalMatch) as totalMatch
+	from RemoveNegations S
+	group by S.entityMatch;
+
+create view SentimentOutput as 
+	select R.* from Aggregation R 
+	consolidate on R.totalMatch using 'ExactMatch';
+output view SentimentOutput;

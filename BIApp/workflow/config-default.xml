@@ -1,0 +1,6 @@
+<configuration>
+    <property>
+        <name>nameNode</name>
+        <value>null</value>
+    </property>
+</configuration>
